@@ -6,11 +6,13 @@ supermercados de Panamá y ver dónde conviene comprarlo.
 Súpers objetivo: Super 99, Riba Smith, El Rey, El Machetazo, PriceSmart,
 Super Xtra y Super Carnes.
 
-**Estado actual (datos reales, no de ejemplo):** 3 de 7 súpers funcionando
-(Super Xtra, El Machetazo, Riba Smith) — **~3200 productos**, **268
-comparables entre súpers**: 254 por código de barras (confiables) y 14 por
-similitud de nombre (marcados "🟡 Coincidencia probable" en la UI, ya que
-Riba Smith no publica EAN — ver "Matching de productos" abajo).
+**Estado actual (datos reales, no de ejemplo):** 4 de 7 súpers funcionando
+(Super Xtra, El Machetazo, Riba Smith, PriceSmart) — **~4100 productos**,
+**280 comparables entre súpers** (aparecen en 2+ súpers): 236 confirmados
+100% por código de barras, y 44 con al menos un precio que entró por
+similitud/coincidencia de nombre (marcados "🟡 Coincidencia probable" en la
+UI — ni Riba Smith ni PriceSmart publican EAN, ver "Matching de productos"
+abajo).
 
 ## Stack
 
@@ -103,9 +105,9 @@ restringido** (solo puede llegar a dominios como GitHub/npm, no a los sitios
 de los supermercados) — por política de la organización, no algo temporal.
 El workflow de GitHub Actions de arriba corre en un runner con internet
 completo, así que no depende de este entorno ni de tu computadora — y ya
-corrió con éxito: trajo ~3200 productos reales de Super Xtra, El Machetazo y
-Riba Smith, 1744 de ellos con código de barras, y 268 comparables entre
-súpers (254 por EAN + 14 por similitud de nombre).
+corrió con éxito: trajo ~4100 productos reales de Super Xtra, El Machetazo,
+Riba Smith y PriceSmart, y 280 comparables entre súpers (236 100% por EAN,
+44 con algún precio por similitud/coincidencia de nombre).
 
 Estado actual de cada súper (`src/scrapers/stores/`):
 
@@ -116,10 +118,10 @@ Estado actual de cada súper (`src/scrapers/stores/`):
 | Riba Smith | ✅ Funcionando (probado en vivo) | Magento confirmado. Su API GraphQL pública (`/graphql`, query `search`) respondió 227 resultados reales para "leche". No trae EAN (Magento no lo expone por defecto), así que estos productos hacen fallback a matching por nombre. |
 | Super 99 | ⛔ Investigado a fondo, sin suerte | Confirmado Magento, pero `search`, `filter` por nombre, y navegación por categoría (`categoryList`) fallan por igual — con o sin header `Store`. Parece un problema real del lado de ellos (índice de catálogo roto), no algo resolvible desde acá. Ver `src/scrapers/stores/super-99.ts`. |
 | Super Carnes | ⛔ Pendiente | Confirmado Magento, pero su WAF (Fastly/Varnish) devuelve 403 a cualquier POST a `/graphql`, incluso con headers Origin/Referer propios del sitio. No se intentó evadirlo más allá de eso. |
-| PriceSmart | ⛔ Pendiente | Plataforma propia sobre Nuxt/Vue, no VTEX/WooCommerce/Magento/Shopify. Su catálogo se sirve por una API interna que habría que descubrir inspeccionando el tráfico real del navegador. |
+| PriceSmart | ✅ Funcionando (probado en vivo) | Plataforma propia sobre Nuxt/Vue, pero su buscador llama a una API de terceros ("Bloomreach Discovery") a través de un proxy propio: `POST /api/br_discovery/getProductsByKeyword`. Se encontró inspeccionando el tráfico real con Playwright (`npm run capture`, ver abajo) — una vez encontrado el endpoint, se scrapea con `fetch` normal, sin necesitar navegador. No trae EAN, así que hace fallback a matching por nombre. |
 | El Rey | ⛔ Pendiente | No se encontró catálogo web navegable con precios — su venta online parece estar solo en la app "Rey Delivery" y PedidosYa. Puede que solo se pueda cargar manualmente. |
 
-Todo esto se investigó con `npm run probe -- <urls>` (`.github/workflows/probe.yml`), que corre en un runner con internet real y prueba firmas de plataforma + los endpoints públicos típicos de VTEX/WooCommerce/Magento/Shopify.
+Todo esto se investigó con `npm run probe -- <urls>` (`.github/workflows/probe.yml`), que corre en un runner con internet real y prueba firmas de plataforma + los endpoints públicos típicos de VTEX/WooCommerce/Magento/Shopify. Cuando un sitio no tiene ninguna API pública estándar (caso PriceSmart), el siguiente paso es `npm run capture -- <url> [término]` (`.github/workflows/capture.yml`), que abre la página con un navegador real (Playwright) y anota todas las llamadas XHR/fetch que dispara, para descubrir su API interna. Antes de confiar en un scraper nuevo, `.github/workflows/test-scraper.yml` lo corre contra una base de datos descartable y muestra qué guardó, sin tocar `prisma/data.db`.
 
 ### Probar un solo scraper a mano
 
@@ -157,8 +159,8 @@ contra la canasta completa de términos — la que usa el workflow de CI.)
   súper Magento resulta tener un atributo custom tipo `barcode`/`ean`
   (`npm run probe` ya chequea esto vía introspección), sería un salto de
   calidad mejor que seguir afinando el matching por texto.
-- Implementar los 4 súpers que faltan (Super 99, Super Carnes, PriceSmart,
-  El Rey — ver tabla de arriba para el detalle de cada bloqueo).
+- Implementar los 3 súpers que faltan (Super 99, Super Carnes, El Rey — ver
+  tabla de arriba para el detalle de cada bloqueo).
 - Página de detalle de producto con historial de precios (ya se guarda en
   `PriceHistory`).
 - "Lista de compras": elegir varios productos y ver en qué súper sale más
