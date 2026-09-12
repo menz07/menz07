@@ -1,4 +1,7 @@
-import { notImplementedScraper } from "../not-implemented";
+import { createMagentoScraper } from "../magento";
 
-// TODO: ribasmith.com — revisar estructura del sitio (plataforma, ¿API?).
-export const ribaSmithScraper = notImplementedScraper("riba-smith", "Riba Smith");
+export const ribaSmithScraper = createMagentoScraper({
+  storeSlug: "riba-smith",
+  storeName: "Riba Smith",
+  baseUrl: "https://www.ribasmith.com",
+});

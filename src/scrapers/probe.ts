@@ -123,7 +123,13 @@ async function probeSite(baseUrl: string) {
   for (const [variant, query] of magentoQueries) {
     const magento = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // Algunos WAFs bloquean POSTs sin Origin/Referer del propio sitio
+        // (que un navegador real siempre manda en una llamada same-origin).
+        Origin: baseUrl,
+        Referer: `${baseUrl.replace(/\/$/, "")}/`,
+      },
       body: JSON.stringify({ query }),
     });
     if (magento.error) {
