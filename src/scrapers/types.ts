@@ -6,6 +6,12 @@ export interface ScrapedProduct {
   imageUrl?: string;
   unit?: string;
   inStock?: boolean;
+  /**
+   * Código de barras (EAN/UPC), si el súper lo publica. Es la forma más
+   * confiable de saber que dos súpers venden EXACTAMENTE el mismo producto
+   * (a diferencia de comparar nombres, que varían mucho de un súper a otro).
+   */
+  ean?: string;
 }
 
 export interface StoreScraper {

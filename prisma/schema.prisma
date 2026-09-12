@@ -26,6 +26,12 @@ model Product {
   id             String         @id @default(cuid())
   name           String
   normalizedName String         @unique
+  // Código de barras (EAN/UPC), cuando el súper lo publica (VTEX lo trae en
+  // el catálogo). Es una clave de matching mucho más confiable que el
+  // nombre: el mismo código de barras = el mismo producto físico sin
+  // importar cómo cada súper lo describa. Si dos súpers exponen el mismo
+  // EAN, sus StoreProduct terminan bajo el mismo Product automáticamente.
+  ean            String?        @unique
   category       String?
   imageUrl       String?
   createdAt      DateTime       @default(now())

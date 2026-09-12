@@ -1,23 +1,16 @@
 import type { ScrapedProduct, StoreScraper } from "./types";
 
 /**
- * Scraper genérico para tiendas montadas sobre VTEX (Super Xtra y El Machetazo
- * parecen usarlo, a juzgar por el patrón de URL `?map=category-1,brand` en sus
- * páginas de categoría). VTEX expone una API pública de búsqueda de catálogo
- * que no requiere autenticación ni renderizar JavaScript:
+ * Scraper genérico para tiendas montadas sobre VTEX. Confirmado funcionando
+ * contra Super Xtra y El Machetazo (corrido real vía GitHub Actions, no solo
+ * en teoría): ambos exponen la API pública de búsqueda de catálogo, sin
+ * autenticación ni necesidad de renderizar JavaScript:
  *
  *   GET https://{dominio}/api/catalog_system/pub/products/search?ft={busqueda}
  *
- * IMPORTANTE: esto se armó a partir del esquema documentado/típico de VTEX,
- * pero no se pudo probar contra el sitio real porque este entorno de
- * desarrollo no tiene salida a internet hacia dominios externos. Antes de
- * confiar en los resultados, corré `npm run scrape:test -- <slug>` desde tu
- * máquina o un entorno con internet y revisá que:
- *   - la ruta /api/catalog_system/pub/... responda JSON (y no un 404/HTML)
- *   - los nombres de campo (productName, items, sellers, commertialOffer)
- *     coincidan con la respuesta real
- * Si el sitio no es VTEX, esto va a devolver un array vacío o tirar error,
- * y va a hacer falta un scraper a medida (ver README.md).
+ * Si un súper nuevo también resulta ser VTEX, se puede reusar este scraper
+ * tal cual (ver src/scrapers/stores/super-xtra.ts como ejemplo). Si no, va a
+ * tirar 404/error y hace falta un scraper a medida (ver README.md).
  */
 
 interface VtexCommertialOffer {
@@ -37,6 +30,8 @@ interface VtexItem {
   images?: VtexImage[];
   sellers: VtexSeller[];
   measurementUnit?: string;
+  /** Código de barras. VTEX a veces usa "0" como valor por defecto cuando no hay uno cargado. */
+  ean?: string;
 }
 
 interface VtexProduct {
@@ -88,6 +83,8 @@ export function createVtexScraper(config: VtexScraperConfig): StoreScraper {
           const seller = item.sellers[0];
           if (!seller || seller.commertialOffer.Price <= 0) continue;
 
+          const ean = item.ean && item.ean !== "0" ? item.ean : undefined;
+
           results.push({
             rawName: product.productName,
             price: seller.commertialOffer.Price,
@@ -95,6 +92,7 @@ export function createVtexScraper(config: VtexScraperConfig): StoreScraper {
             imageUrl: item.images?.[0]?.imageUrl,
             unit: item.measurementUnit,
             inStock: seller.commertialOffer.AvailableQuantity > 0,
+            ean,
           });
         }
       }

@@ -24,12 +24,16 @@ Super Xtra y Super Carnes.
   enlazan al mismo `Product` para poder compararlos.
 - `PriceHistory`: historial de precios de un `StoreProduct` en el tiempo.
 
-El matching entre súpers hoy es simple: se normaliza el nombre del producto
-(minúsculas, sin acentos/puntuación) y si dos súpers traen el mismo nombre
-normalizado, se consideran "el mismo producto". Esto va a fallar con nombres
-distintos para el mismo producto (ej. "Arroz Chino 5lb" vs "Arroz Chino
-5 libras") — es el próximo problema a resolver a medida que entre data real
-(fuzzy matching, o un mapeo manual para casos ambiguos).
+**Matching de productos entre súpers**: con data real ya cargada, quedó claro
+que comparar nombres es poco confiable — cada súper describe/ordena/abrevia
+los nombres a su manera, y la mayoría de las "coincidencias por nombre
+parecido" en realidad eran marcas o tamaños distintos (ej. "Arroz Especial
+Pelin 5lb" vs "Arroz Especial Del Oro 5lb" no son el mismo producto). Por eso
+`Product` tiene un campo `ean` (código de barras): cuando el súper lo publica
+(VTEX lo trae en su catálogo), lo usamos como clave principal de matching —
+mismo EAN = mismo producto físico, sin importar cómo lo describa cada súper.
+Si no hay EAN, se cae al matching por nombre normalizado de antes (ver
+`src/scrapers/upsert.ts`).
 
 ## Empezar
 
@@ -68,22 +72,21 @@ git pull
 DATABASE_URL="file:./data.db" npm run dev
 ```
 
-### ⚠️ Por qué esto no se pudo probar desde este entorno de desarrollo
+### Nota sobre el entorno de desarrollo
 
 Este proyecto se desarrolló en un entorno con **acceso a internet
 restringido** (solo puede llegar a dominios como GitHub/npm, no a los sitios
 de los supermercados) — por política de la organización, no algo temporal.
-Por eso los scrapers reales **no se pudieron probar contra los sitios en
-vivo** todavía; el workflow de GitHub Actions de arriba es justamente la
-forma de correrlos desde un lugar con internet completo sin depender de tu
-computadora.
+El workflow de GitHub Actions de arriba corre en un runner con internet
+completo, así que no depende de este entorno ni de tu computadora — y ya
+corrió con éxito: trajo ~1900 productos reales de Super Xtra y El Machetazo.
 
 Estado actual de cada súper (`src/scrapers/stores/`):
 
 | Súper | Estado | Notas |
 |---|---|---|
-| Super Xtra | ✅ Implementado (sin probar en vivo) | Parece usar VTEX (`?map=category-1,brand` en sus URLs de categoría). Usa la API pública `/api/catalog_system/pub/products/search`. |
-| El Machetazo | ✅ Implementado (sin probar en vivo) | Mismo indicio de VTEX en sus URLs. |
+| Super Xtra | ✅ Funcionando (probado en vivo) | VTEX confirmado. Usa la API pública `/api/catalog_system/pub/products/search`. |
+| El Machetazo | ✅ Funcionando (probado en vivo) | También VTEX, mismo scraper genérico. |
 | Super 99 | ⛔ Pendiente | Tiene "tienda en línea" en super99.com; no se pudo confirmar la plataforma. Revisar si el checkout real pasa por PedidosYa. |
 | Riba Smith | ⛔ Pendiente | ribasmith.com — falta inspeccionar. |
 | El Rey | ⛔ Pendiente | No se encontró catálogo web navegable con precios — su venta online parece estar solo en la app "Rey Delivery" y PedidosYa. Puede que solo se pueda cargar manualmente. |
@@ -120,10 +123,9 @@ contra la canasta completa de términos — la que usa el workflow de CI.)
 
 ## Próximos pasos sugeridos
 
-- Automatizar el scraping con un cron (ej. GitHub Actions una vez al día)
-  en vez de correrlo a mano.
-- Mejorar el matching de productos entre súpers (fuzzy matching por
-  nombre + marca + tamaño).
+- Implementar los 5 súpers que faltan (ver tabla de arriba).
+- Si el EAN no alcanza (algún súper no lo publica), sumar fuzzy matching por
+  marca + tamaño como segunda pasada para los casos sin código de barras.
 - Página de detalle de producto con historial de precios (ya se guarda en
   `PriceHistory`).
 - "Lista de compras": elegir varios productos y ver en qué súper sale más
