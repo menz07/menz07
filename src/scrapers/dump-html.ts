@@ -44,6 +44,13 @@ async function main() {
   console.log(`data-price-amount encontrados: ${priceMatches.length}`);
   console.log(`  primeros valores: ${priceMatches.slice(0, 10).map((m) => m[1]).join(", ")}`);
 
+  if (linkMatches.length) {
+    const firstIdx = html.indexOf(linkMatches[0][0]);
+    const start = Math.max(0, firstIdx - 1500);
+    console.log("\n--- contexto grande alrededor del primer product-item-link ---");
+    console.log(html.slice(start, firstIdx + 2500));
+  }
+
   // Si nada de lo anterior aparece, mostramos un bloque grande alrededor de
   // la primera ocurrencia de "product" para ver qué markup usa este tema.
   if (!ldMatches.length && !productItems.length && !linkMatches.length) {
