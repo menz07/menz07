@@ -7,10 +7,10 @@ Súpers objetivo: Super 99, Riba Smith, El Rey, El Machetazo, PriceSmart,
 Super Xtra y Super Carnes.
 
 **Estado actual (datos reales, no de ejemplo):** 3 de 7 súpers funcionando
-(Super Xtra, El Machetazo, Riba Smith) — **3105 productos**, **246
-comparables entre súpers** gracias al matching por código de barras (Super
-Xtra ↔ El Machetazo; Riba Smith no publica EAN, así que sus 1175 productos
-todavía no cruzan con los otros — ver "Próximos pasos").
+(Super Xtra, El Machetazo, Riba Smith) — **~3200 productos**, **268
+comparables entre súpers**: 254 por código de barras (confiables) y 14 por
+similitud de nombre (marcados "🟡 Coincidencia probable" en la UI, ya que
+Riba Smith no publica EAN — ver "Matching de productos" abajo).
 
 ## Stack
 
@@ -103,9 +103,9 @@ restringido** (solo puede llegar a dominios como GitHub/npm, no a los sitios
 de los supermercados) — por política de la organización, no algo temporal.
 El workflow de GitHub Actions de arriba corre en un runner con internet
 completo, así que no depende de este entorno ni de tu computadora — y ya
-corrió con éxito: trajo 3105 productos reales de Super Xtra, El Machetazo y
-Riba Smith, 1744 de ellos con código de barras, y 246 comparables entre
-súpers.
+corrió con éxito: trajo ~3200 productos reales de Super Xtra, El Machetazo y
+Riba Smith, 1744 de ellos con código de barras, y 268 comparables entre
+súpers (254 por EAN + 14 por similitud de nombre).
 
 Estado actual de cada súper (`src/scrapers/stores/`):
 
