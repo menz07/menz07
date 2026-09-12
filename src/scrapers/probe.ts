@@ -108,8 +108,16 @@ async function probeSite(baseUrl: string) {
       '{ products(search: "leche", pageSize: 3) { total_count items { name sku } } }',
     ],
     [
-      "filter",
+      "filter name",
       '{ products(filter: { name: { match: "leche" } }, pageSize: 3) { total_count items { name sku } } }',
+    ],
+    [
+      "sin filtro (sanity check)",
+      "{ products(pageSize: 3) { total_count items { name sku } } }",
+    ],
+    [
+      "filter sku wildcard",
+      '{ products(filter: { sku: { like: "%" } }, pageSize: 3) { total_count items { name sku } } }',
     ],
   ];
   for (const [variant, query] of magentoQueries) {
