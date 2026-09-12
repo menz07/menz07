@@ -19,6 +19,7 @@ async function findFuzzyMatch(
   rawName: string,
   storeId: string,
   currentUrl: string,
+  excludeProductId?: string,
 ) {
   const target = tokenizeProductName(rawName);
   if (!target.words.length) return null;
@@ -36,6 +37,7 @@ async function findFuzzyMatch(
 
   let best: { product: (typeof candidates)[number]; score: number } | null = null;
   for (const candidate of candidates) {
+    if (candidate.id === excludeProductId) continue;
     const score = similarity(target, tokenizeProductName(candidate.name));
     if (score > 0 && (!best || score > best.score)) {
       best = { product: candidate, score };
@@ -50,7 +52,13 @@ async function findFuzzyMatch(
  * Orden de prioridad:
  *   1. Código de barras (EAN), si el súper lo publica — la señal más
  *      confiable de que dos súpers venden el mismo producto físico.
- *   2. Nombre normalizado exacto.
+ *   2. Nombre normalizado exacto, PERO solo si ya es de OTRO súper — si el
+ *      único dueño de ese nombre es este mismo súper (su propio registro de
+ *      un scrape anterior, antes de que hubiera EAN/fuzzy), no cuenta como
+ *      match real: lo tratamos como si no existiera y probamos fuzzy antes
+ *      de resignarnos a reusarlo. Si no fuera así, un producto ya scrapeado
+ *      una vez quedaría bloqueado para siempre y nunca podría cruzar con
+ *      otro súper más adelante.
  *   3. Similitud de nombre (fuzzy match) — para súpers sin EAN (ej. Magento)
  *      cuyo nombre no coincide letra por letra con el de otro súper.
  */
@@ -92,10 +100,19 @@ async function resolveProduct(
   }
 
   const exact = await prisma.product.findUnique({ where: { normalizedName } });
-  if (exact) return { product: exact, matchMethod: "name" };
+  const exactIsCrossStore =
+    exact &&
+    (await prisma.storeProduct.count({
+      where: { productId: exact.id, storeId: { not: storeId } },
+    })) > 0;
+  if (exact && exactIsCrossStore) {
+    return { product: exact, matchMethod: "name" };
+  }
 
-  const fuzzy = await findFuzzyMatch(item.rawName, storeId, item.url);
+  const fuzzy = await findFuzzyMatch(item.rawName, storeId, item.url, exact?.id);
   if (fuzzy) return { product: fuzzy, matchMethod: "fuzzy" };
+
+  if (exact) return { product: exact, matchMethod: "name" };
 
   const created = await prisma.product.create({
     data: { name: item.rawName, normalizedName },
