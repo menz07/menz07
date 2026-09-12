@@ -50,6 +50,8 @@ const UNIT_ALIASES: Record<string, string> = {
   pack: "un",
   pk: "un",
   paquete: "un",
+  rollo: "un",
+  rollos: "un",
 };
 
 // OJO: "con"/"sin" NO están acá a propósito — son diferenciadores reales
@@ -129,9 +131,9 @@ export function tokenizeProductName(rawName: string): NameTokens {
       continue;
     }
 
-    // Número y unidad pegados, ej. "800g", "5lb", "2.27kg", "12un", "4pk".
+    // Número y unidad pegados, ej. "800g", "5lb", "2.27kg", "12un", "4pk", "9rollos".
     const stuck = tok.match(
-      /^(\d+(?:\.\d+)?)(kg|kgs|g|gr|grs|lb|lbs|oz|ml|lt|lts|l|gal|gl|und|un|pk)$/,
+      /^(\d+(?:\.\d+)?)(kg|kgs|g|gr|grs|lb|lbs|oz|ml|lt|lts|l|gal|gl|und|un|pk|rollos|rollo)$/,
     );
     if (stuck) {
       const unit = UNIT_ALIASES[stuck[2]] ?? stuck[2];
