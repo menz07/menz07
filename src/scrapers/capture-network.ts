@@ -64,6 +64,7 @@ async function main() {
 
   if (searchTerm) {
     console.log(`Buscando "${searchTerm}" en algún input de la página...`);
+    console.log(`  URL antes de buscar: ${page.url()}`);
     const selectors = [
       'input[type="search"]',
       'input[placeholder*="uscar" i]',
@@ -73,14 +74,15 @@ async function main() {
       ".search-input input",
     ];
     let typed = false;
+    let usedSelector = "";
     for (const sel of selectors) {
       const input = page.locator(sel).first();
       if ((await input.count()) > 0) {
         try {
           await input.click({ timeout: 3000 });
           await input.fill(searchTerm, { timeout: 3000 });
-          await input.press("Enter");
           typed = true;
+          usedSelector = sel;
           console.log(`  Escrito en el selector: ${sel}`);
           break;
         } catch {
@@ -91,6 +93,41 @@ async function main() {
     if (!typed) {
       console.log("  No encontramos un input de búsqueda obvio en la página.");
     } else {
+      const before = captured.length;
+      await page.locator(usedSelector).first().press("Enter");
+      console.log("  Enter presionado, esperando actividad de red...");
+      await page.waitForTimeout(4000);
+      console.log(`  Llamadas nuevas tras Enter: ${captured.length - before}`);
+      for (const c of captured.slice(before)) console.log(`    -> ${c.method} ${c.status} ${c.url}`);
+      console.log(`  URL tras Enter: ${page.url()}`);
+
+      if (captured.length === before) {
+        console.log("  Enter no disparó llamadas nuevas, probando botón de búsqueda...");
+        const buttonSelectors = [
+          'button[type="submit"]',
+          'button[aria-label*="uscar" i]',
+          ".search-button",
+          "button.search",
+          '[class*="search"] button',
+          '[class*="Search"] button',
+        ];
+        for (const bsel of buttonSelectors) {
+          const btn = page.locator(bsel).first();
+          if ((await btn.count()) > 0) {
+            try {
+              await btn.click({ timeout: 3000 });
+              console.log(`  Click en botón: ${bsel}`);
+              await page.waitForTimeout(4000);
+              console.log(`  Llamadas nuevas tras click: ${captured.length - before}`);
+              console.log(`  URL tras click: ${page.url()}`);
+              break;
+            } catch {
+              // probamos el siguiente
+            }
+          }
+        }
+      }
+
       try {
         await page.waitForLoadState("networkidle", { timeout: TIMEOUT_MS });
       } catch {
