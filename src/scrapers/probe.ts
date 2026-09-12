@@ -17,12 +17,17 @@
 
 const TIMEOUT_MS = 15_000;
 
-async function fetchSafe(url: string, headers: Record<string, string> = {}) {
+async function fetchSafe(
+  url: string,
+  options: { headers?: Record<string, string>; method?: string; body?: string } = {},
+) {
   try {
     const res = await fetch(url, {
+      method: options.method,
+      body: options.body,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; PriceCompareBot/1.0)",
-        ...headers,
+        ...options.headers,
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -52,14 +57,17 @@ async function probeSite(baseUrl: string) {
     console.log(`  Home: ERROR — ${home.error}`);
   } else {
     console.log(`  Home: HTTP ${home.status}, ${home.text.length} bytes`);
-    const matches = PLATFORM_SIGNATURES.filter(([, patterns]) =>
-      patterns.some((p) => p.test(home.text)),
-    ).map(([name]) => name);
-    console.log(
-      matches.length
-        ? `  Firmas encontradas en el HTML: ${matches.join(", ")}`
-        : "  Sin firmas de plataforma conocidas en el HTML de home.",
-    );
+    for (const [name, patterns] of PLATFORM_SIGNATURES) {
+      for (const pattern of patterns) {
+        const match = home.text.match(pattern);
+        if (match?.index !== undefined) {
+          const start = Math.max(0, match.index - 40);
+          const context = home.text.slice(start, match.index + 60).replace(/\s+/g, " ");
+          console.log(`  Firma "${name}" (${pattern}): ...${context}...`);
+          break;
+        }
+      }
+    }
   }
 
   // VTEX: API pública de búsqueda de catálogo.
@@ -88,6 +96,26 @@ async function probeSite(baseUrl: string) {
       `  WooCommerce Store API: HTTP ${woo.status}${looksJson ? " — responde un array JSON, ¡es WooCommerce!" : ""}`,
     );
     if (looksJson) console.log(`    Muestra: ${woo.text.slice(0, 500)}`);
+  }
+
+  // Magento: API GraphQL pública (la mayoría de las tiendas Magento la
+  // dejan abierta para lectura de catálogo).
+  const magento = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query:
+        '{ products(search: "leche", pageSize: 3) { total_count items { name sku } } }',
+    }),
+  });
+  if (magento.error) {
+    console.log(`  Magento GraphQL: ERROR — ${magento.error}`);
+  } else {
+    const hasData = magento.text.includes('"products"');
+    console.log(
+      `  Magento GraphQL: HTTP ${magento.status}${hasData ? " — ¡tiene catálogo por GraphQL!" : ""}`,
+    );
+    if (hasData) console.log(`    Muestra: ${magento.text.slice(0, 500)}`);
   }
 
   // Shopify: catálogo público en /products.json.
