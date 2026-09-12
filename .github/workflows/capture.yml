@@ -1,0 +1,45 @@
+name: Espiar red de un súper (Playwright)
+
+# Herramienta manual para súpers sin API pública conocida: abre la URL con
+# un navegador real y anota qué llamadas XHR/fetch dispara, para descubrir
+# su API interna. Necesita instalar el navegador de Playwright, a
+# diferencia de probe.yml que solo hace fetch() plano.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL a abrir (ej. página de búsqueda del súper)"
+        required: true
+        type: string
+      searchTerm:
+        description: "Término a escribir en el buscador de la página (opcional)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar navegador de Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Espiar sitio
+        env:
+          CAPTURE_URL: ${{ inputs.url }}
+          CAPTURE_TERM: ${{ inputs.searchTerm }}
+        run: npm run capture -- "$CAPTURE_URL" "$CAPTURE_TERM"

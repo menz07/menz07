@@ -12,7 +12,8 @@
     "db:studio": "prisma studio",
     "scrape": "tsx src/scrapers/run.ts",
     "scrape:all": "tsx src/scrapers/run-all.ts",
-    "probe": "tsx src/scrapers/probe.ts"
+    "probe": "tsx src/scrapers/probe.ts",
+    "capture": "tsx src/scrapers/capture-network.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
