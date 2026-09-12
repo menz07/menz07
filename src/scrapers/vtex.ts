@@ -63,6 +63,10 @@ export function createVtexScraper(config: VtexScraperConfig): StoreScraper {
 
       const res = await fetch(searchUrl, {
         headers: { Accept: "application/json" },
+        // Sin esto, una sola conexión colgada puede frenar todo el job de
+        // CI por varios minutos (nos pasó corriendo esto contra sitios
+        // reales) en vez de fallar rápido y seguir con el próximo término.
+        signal: AbortSignal.timeout(20_000),
       });
       if (!res.ok) {
         throw new Error(

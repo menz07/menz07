@@ -6,6 +6,10 @@ supermercados de Panamá y ver dónde conviene comprarlo.
 Súpers objetivo: Super 99, Riba Smith, El Rey, El Machetazo, PriceSmart,
 Super Xtra y Super Carnes.
 
+**Estado actual (datos reales, no de ejemplo):** ~1977 productos scrapeados
+de Super Xtra y El Machetazo, con **246 productos comparables entre los dos
+súpers** gracias al matching por código de barras.
+
 ## Stack
 
 - **Next.js (App Router) + TypeScript + Tailwind** — la app web.
@@ -79,7 +83,8 @@ restringido** (solo puede llegar a dominios como GitHub/npm, no a los sitios
 de los supermercados) — por política de la organización, no algo temporal.
 El workflow de GitHub Actions de arriba corre en un runner con internet
 completo, así que no depende de este entorno ni de tu computadora — y ya
-corrió con éxito: trajo ~1900 productos reales de Super Xtra y El Machetazo.
+corrió con éxito: trajo ~1977 productos reales de Super Xtra y El Machetazo,
+1744 de ellos con código de barras, y 246 comparables entre ambos súpers.
 
 Estado actual de cada súper (`src/scrapers/stores/`):
 
