@@ -143,6 +143,61 @@ async function probeSite(baseUrl: string) {
     console.log(`    Muestra: ${magento.text.slice(0, 500)}`);
   }
 
+  // Magento: si buscar por texto no funciona, probamos navegar por
+  // categoría (categoryList -> category_id) en vez de fulltext/filter.
+  const categoryTree = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: baseUrl,
+      Referer: `${baseUrl.replace(/\/$/, "")}/`,
+    },
+    body: JSON.stringify({
+      query:
+        "{ categoryList { id name url_key product_count children { id name url_key product_count children { id name url_key product_count } } } }",
+    }),
+  });
+  if (!categoryTree.error && categoryTree.text.includes('"categoryList"')) {
+    console.log(`  Magento categoryList: HTTP ${categoryTree.status}`);
+    // Buscamos alguna categoría con productos para probar traerlos.
+    const idsWithCount = [
+      ...categoryTree.text.matchAll(/"id":(\d+)[^}]*?"product_count":(\d+)/g),
+    ]
+      .map(([, id, count]) => ({ id, count: Number(count) }))
+      .filter((c) => c.count > 0)
+      .sort((a, b) => b.count - a.count);
+    console.log(
+      `    Categorías con productos encontradas: ${idsWithCount.length}${
+        idsWithCount.length
+          ? ` (ej. id=${idsWithCount[0].id} con ${idsWithCount[0].count} productos)`
+          : ""
+      }`,
+    );
+    if (idsWithCount.length) {
+      const catId = idsWithCount[0].id;
+      const byCategory = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: baseUrl,
+          Referer: `${baseUrl.replace(/\/$/, "")}/`,
+        },
+        body: JSON.stringify({
+          query: `{ products(filter: { category_id: { eq: "${catId}" } }, pageSize: 3) { total_count items { name sku } } }`,
+        }),
+      });
+      console.log(
+        `    Productos de categoría ${catId}: HTTP ${byCategory.status}`,
+      );
+      console.log(`      Muestra: ${byCategory.text.slice(0, 500)}`);
+    }
+  } else if (categoryTree.error) {
+    console.log(`  Magento categoryList: ERROR — ${categoryTree.error}`);
+  } else {
+    console.log(`  Magento categoryList: HTTP ${categoryTree.status}, sin categoryList en la respuesta`);
+    console.log(`    Muestra: ${categoryTree.text.slice(0, 300)}`);
+  }
+
   // Introspección: ¿el ProductInterface de Magento expone algún atributo
   // tipo código de barras/EAN? (útil para matching entre súpers en vez de
   // solo por nombre). Inofensivo de probar aunque el sitio no sea Magento.
