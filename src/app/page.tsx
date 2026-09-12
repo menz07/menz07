@@ -15,7 +15,7 @@ export default async function Home({
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
 
-  const products = await prisma.product.findMany({
+  const matches = await prisma.product.findMany({
     where: query ? { name: { contains: query } } : undefined,
     include: {
       storeProducts: {
@@ -25,8 +25,20 @@ export default async function Home({
       },
     },
     orderBy: { name: "asc" },
-    take: 50,
+    take: 200,
   });
+
+  // Mostramos primero los productos que sí tenemos en 2+ súpers (donde la
+  // comparación de precios realmente sirve), y dentro de esos, los que
+  // aparecen en más súpers primero.
+  const products = matches
+    .map((product) => ({
+      ...product,
+      distinctStores: new Set(product.storeProducts.map((sp) => sp.storeId))
+        .size,
+    }))
+    .sort((a, b) => b.distinctStores - a.distinctStores)
+    .slice(0, 50);
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-50 font-sans dark:bg-black">
@@ -64,7 +76,13 @@ export default async function Home({
           )}
 
           {products.map((product) => {
-            const cheapest = product.storeProducts[0];
+            // Solo tiene sentido resaltar "más barato" si hay algo con qué
+            // comparar (2+ súpers distintos) — si no, es el único precio
+            // que encontramos, no una ganga.
+            const cheapest =
+              product.distinctStores > 1
+                ? product.storeProducts[0]
+                : undefined;
             return (
               <div
                 key={product.id}
