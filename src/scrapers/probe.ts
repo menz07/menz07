@@ -120,27 +120,36 @@ async function probeSite(baseUrl: string) {
       '{ products(filter: { sku: { like: "%" } }, pageSize: 3) { total_count items { name sku } } }',
     ],
   ];
+  // Instalaciones Magento multi-tienda a veces resuelven a un scope roto
+  // (índice vacío) si no mandás el header "Store" con el código de la
+  // tienda — probamos sin header y con un par de códigos típicos.
+  const storeCodes = [undefined, "default", "base"];
+
   for (const [variant, query] of magentoQueries) {
-    const magento = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Algunos WAFs bloquean POSTs sin Origin/Referer del propio sitio
-        // (que un navegador real siempre manda en una llamada same-origin).
-        Origin: baseUrl,
-        Referer: `${baseUrl.replace(/\/$/, "")}/`,
-      },
-      body: JSON.stringify({ query }),
-    });
-    if (magento.error) {
-      console.log(`  Magento GraphQL (${variant}): ERROR — ${magento.error}`);
-      continue;
+    for (const storeCode of storeCodes) {
+      const magento = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Algunos WAFs bloquean POSTs sin Origin/Referer del propio sitio
+          // (que un navegador real siempre manda en una llamada same-origin).
+          Origin: baseUrl,
+          Referer: `${baseUrl.replace(/\/$/, "")}/`,
+          ...(storeCode ? { Store: storeCode } : {}),
+        },
+        body: JSON.stringify({ query }),
+      });
+      const label = `${variant}${storeCode ? `, Store=${storeCode}` : ""}`;
+      if (magento.error) {
+        console.log(`  Magento GraphQL (${label}): ERROR — ${magento.error}`);
+        continue;
+      }
+      const hasData = /"products":\s*\{\s*"total_count":\s*[1-9]/.test(magento.text);
+      console.log(
+        `  Magento GraphQL (${label}): HTTP ${magento.status}${hasData ? " — ¡tiene catálogo!" : ""}`,
+      );
+      console.log(`    Muestra: ${magento.text.slice(0, 500)}`);
     }
-    const hasData = /"products":\s*\{\s*"total_count":\s*[1-9]/.test(magento.text);
-    console.log(
-      `  Magento GraphQL (${variant}): HTTP ${magento.status}${hasData ? " — ¡tiene catálogo!" : ""}`,
-    );
-    console.log(`    Muestra: ${magento.text.slice(0, 500)}`);
   }
 
   // Magento: si buscar por texto no funciona, probamos navegar por
