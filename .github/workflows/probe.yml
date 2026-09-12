@@ -1,0 +1,37 @@
+name: Investigar plataforma de un súper
+
+# Herramienta manual: corre src/scrapers/probe.ts contra las URLs que le
+# pases, desde un runner con internet real, y deja el resultado en el log
+# del job. Se usa para decidir cómo escribir el scraper de un súper nuevo
+# sin depender de un entorno de desarrollo con red restringida.
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "URLs a inspeccionar, separadas por espacio"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Probar sitios
+        env:
+          PROBE_URLS: ${{ inputs.urls }}
+        run: npm run probe -- $PROBE_URLS
