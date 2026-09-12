@@ -6,9 +6,11 @@ supermercados de Panamá y ver dónde conviene comprarlo.
 Súpers objetivo: Super 99, Riba Smith, El Rey, El Machetazo, PriceSmart,
 Super Xtra y Super Carnes.
 
-**Estado actual (datos reales, no de ejemplo):** ~1977 productos scrapeados
-de Super Xtra y El Machetazo, con **246 productos comparables entre los dos
-súpers** gracias al matching por código de barras.
+**Estado actual (datos reales, no de ejemplo):** 3 de 7 súpers funcionando
+(Super Xtra, El Machetazo, Riba Smith) — **3105 productos**, **246
+comparables entre súpers** gracias al matching por código de barras (Super
+Xtra ↔ El Machetazo; Riba Smith no publica EAN, así que sus 1175 productos
+todavía no cruzan con los otros — ver "Próximos pasos").
 
 ## Stack
 
@@ -83,20 +85,23 @@ restringido** (solo puede llegar a dominios como GitHub/npm, no a los sitios
 de los supermercados) — por política de la organización, no algo temporal.
 El workflow de GitHub Actions de arriba corre en un runner con internet
 completo, así que no depende de este entorno ni de tu computadora — y ya
-corrió con éxito: trajo ~1977 productos reales de Super Xtra y El Machetazo,
-1744 de ellos con código de barras, y 246 comparables entre ambos súpers.
+corrió con éxito: trajo 3105 productos reales de Super Xtra, El Machetazo y
+Riba Smith, 1744 de ellos con código de barras, y 246 comparables entre
+súpers.
 
 Estado actual de cada súper (`src/scrapers/stores/`):
 
 | Súper | Estado | Notas |
 |---|---|---|
-| Super Xtra | ✅ Funcionando (probado en vivo) | VTEX confirmado. Usa la API pública `/api/catalog_system/pub/products/search`. |
-| El Machetazo | ✅ Funcionando (probado en vivo) | También VTEX, mismo scraper genérico. |
-| Super 99 | ⛔ Pendiente | Tiene "tienda en línea" en super99.com; no se pudo confirmar la plataforma. Revisar si el checkout real pasa por PedidosYa. |
-| Riba Smith | ⛔ Pendiente | ribasmith.com — falta inspeccionar. |
+| Super Xtra | ✅ Funcionando (probado en vivo) | VTEX confirmado. Usa la API pública `/api/catalog_system/pub/products/search`. Trae código de barras (EAN). |
+| El Machetazo | ✅ Funcionando (probado en vivo) | También VTEX, mismo scraper genérico. Trae EAN. |
+| Riba Smith | ✅ Funcionando (probado en vivo) | Magento confirmado. Su API GraphQL pública (`/graphql`, query `search`) respondió 227 resultados reales para "leche". No trae EAN (Magento no lo expone por defecto), así que estos productos hacen fallback a matching por nombre. |
+| Super 99 | ⛔ Pendiente | Confirmado Magento, pero su catálogo no responde ni por `search` (error interno del lado de ellos) ni por `filter` por nombre (0 resultados) — ver `src/scrapers/stores/super-99.ts` para el detalle. Probablemente haga falta navegar por categoría en vez de buscar por texto. |
+| Super Carnes | ⛔ Pendiente | Confirmado Magento, pero su WAF (Fastly/Varnish) devuelve 403 a cualquier POST a `/graphql`, incluso con headers Origin/Referer propios del sitio. No se intentó evadirlo más allá de eso. |
+| PriceSmart | ⛔ Pendiente | Plataforma propia sobre Nuxt/Vue, no VTEX/WooCommerce/Magento/Shopify. Su catálogo se sirve por una API interna que habría que descubrir inspeccionando el tráfico real del navegador. |
 | El Rey | ⛔ Pendiente | No se encontró catálogo web navegable con precios — su venta online parece estar solo en la app "Rey Delivery" y PedidosYa. Puede que solo se pueda cargar manualmente. |
-| PriceSmart | ⛔ Pendiente | Plataforma propia (URLs tipo `/categoria/Alimentos-G10D03/G10D03`), no parece VTEX. |
-| Super Carnes | ⛔ Pendiente | supercarnes.com — falta inspeccionar. |
+
+Todo esto se investigó con `npm run probe -- <urls>` (`.github/workflows/probe.yml`), que corre en un runner con internet real y prueba firmas de plataforma + los endpoints públicos típicos de VTEX/WooCommerce/Magento/Shopify.
 
 ### Probar un solo scraper a mano
 
@@ -128,9 +133,14 @@ contra la canasta completa de términos — la que usa el workflow de CI.)
 
 ## Próximos pasos sugeridos
 
-- Implementar los 5 súpers que faltan (ver tabla de arriba).
-- Si el EAN no alcanza (algún súper no lo publica), sumar fuzzy matching por
-  marca + tamaño como segunda pasada para los casos sin código de barras.
+- **Matching de Riba Smith (y cualquier súper Magento sin EAN)**: sus 1175
+  productos hoy no cruzan con nadie porque Magento no expone código de
+  barras de fábrica y el nombre casi nunca coincide exacto con el de otro
+  súper. Alternativas: revisar si el catálogo tiene algún atributo custom
+  tipo `barcode`/`ean` vía introspección (`npm run probe` ya lo chequea), o
+  sumar fuzzy matching por marca + tamaño como segunda pasada.
+- Implementar los 4 súpers que faltan (Super 99, Super Carnes, PriceSmart,
+  El Rey — ver tabla de arriba para el detalle de cada bloqueo).
 - Página de detalle de producto con historial de precios (ya se guarda en
   `PriceHistory`).
 - "Lista de compras": elegir varios productos y ver en qué súper sale más

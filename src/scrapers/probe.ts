@@ -143,6 +143,37 @@ async function probeSite(baseUrl: string) {
     console.log(`    Muestra: ${magento.text.slice(0, 500)}`);
   }
 
+  // Introspección: ¿el ProductInterface de Magento expone algún atributo
+  // tipo código de barras/EAN? (útil para matching entre súpers en vez de
+  // solo por nombre). Inofensivo de probar aunque el sitio no sea Magento.
+  const introspection = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: baseUrl,
+      Referer: `${baseUrl.replace(/\/$/, "")}/`,
+    },
+    body: JSON.stringify({
+      query:
+        '{ __type(name: "ProductInterface") { fields { name } } }',
+    }),
+  });
+  if (!introspection.error && introspection.text.includes('"fields"')) {
+    const fieldNames = [...introspection.text.matchAll(/"name":"([^"]+)"/g)].map(
+      (m) => m[1],
+    );
+    const barcodeLike = fieldNames.filter((f) =>
+      /ean|barcode|upc|gtin|codigo/i.test(f),
+    );
+    console.log(
+      `  Introspección ProductInterface: ${fieldNames.length} campos totales.${
+        barcodeLike.length
+          ? ` Posibles campos de código de barras: ${barcodeLike.join(", ")}`
+          : " Ninguno parece un código de barras."
+      }`,
+    );
+  }
+
   // Shopify: catálogo público en /products.json.
   const shopify = await fetchSafe(
     `${baseUrl.replace(/\/$/, "")}/products.json?limit=5`,
