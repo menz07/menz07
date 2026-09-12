@@ -1,0 +1,76 @@
+name: Probar un scraper con una búsqueda puntual
+
+# Herramienta manual para probar `npm run scrape` contra un súper real antes
+# de confiar en él para el scrape diario — usa una base de datos descartable
+# (no toca prisma/data.db ni lo commitea), solo muestra en el log cuántos
+# productos trajo y deja ver los datos.
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Término a buscar"
+        required: true
+        type: string
+      storeSlug:
+        description: "storeSlug a probar (ej. pricesmart)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar cliente de Prisma
+        run: npx prisma generate
+
+      - name: Preparar base de datos descartable
+        env:
+          DATABASE_URL: file:./test.db
+        run: npx prisma migrate deploy
+
+      - name: Asegurar que existan los súpers
+        env:
+          DATABASE_URL: file:./test.db
+        run: npm run db:seed:stores
+
+      - name: Correr el scraper
+        env:
+          DATABASE_URL: file:./test.db
+          QUERY: ${{ inputs.query }}
+          STORE_SLUG: ${{ inputs.storeSlug }}
+        run: npm run scrape -- "$QUERY" "$STORE_SLUG"
+
+      - name: Mostrar lo que quedó guardado
+        env:
+          DATABASE_URL: file:./test.db
+        run: |
+          node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const prisma = new PrismaClient();
+            (async () => {
+              const rows = await prisma.storeProduct.findMany({
+                include: { product: true, store: true },
+                take: 20,
+              });
+              for (const r of rows) {
+                console.log(\`\${r.store.name} | \${r.product.name} | \${r.price} | match=\${r.matchMethod} | \${r.url}\`);
+              }
+              console.log(\`Total filas: \${await prisma.storeProduct.count()}\`);
+              await prisma.\$disconnect();
+            })();
+          "
