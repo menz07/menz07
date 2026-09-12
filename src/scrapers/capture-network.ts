@@ -21,6 +21,8 @@ interface Captured {
   status: number;
   url: string;
   body: string;
+  requestHeaders?: Record<string, string>;
+  requestBody?: string;
 }
 
 async function main() {
@@ -47,11 +49,14 @@ async function main() {
     } catch {
       body = "(no se pudo leer el body)";
     }
+    const interesting = response.url().includes("br_discovery") || response.url().includes("bloomreach");
     captured.push({
       method: req.method(),
       status: response.status(),
       url: response.url(),
-      body: body.slice(0, 3000),
+      body: body.slice(0, interesting ? 6000 : 3000),
+      requestHeaders: interesting ? req.headers() : undefined,
+      requestBody: interesting ? (req.postData() ?? undefined) : undefined,
     });
   });
 
@@ -141,6 +146,13 @@ async function main() {
   console.log(`\n${captured.length} llamadas XHR/fetch capturadas:\n`);
   for (const c of captured) {
     console.log(`\n=== ${c.method} ${c.status} ${c.url} ===`);
+    if (c.requestHeaders) {
+      console.log(`--- request headers ---\n${JSON.stringify(c.requestHeaders, null, 2)}`);
+    }
+    if (c.requestBody) {
+      console.log(`--- request body ---\n${c.requestBody}`);
+    }
+    console.log(`--- response body ---`);
     console.log(c.body);
   }
 }
