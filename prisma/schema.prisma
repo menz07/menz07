@@ -1,0 +1,64 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Un supermercado (Super 99, Riba Smith, etc).
+model Store {
+  id            String         @id @default(cuid())
+  slug          String         @unique
+  name          String
+  websiteUrl    String
+  createdAt     DateTime       @default(now())
+  storeProducts StoreProduct[]
+}
+
+// Un producto "canónico": la misma leche/arroz/etc, sin importar en qué súper esté.
+// Varios StoreProduct de distintos súpers se enlazan al mismo Product para poder compararlos.
+model Product {
+  id             String         @id @default(cuid())
+  name           String
+  normalizedName String         @unique
+  category       String?
+  imageUrl       String?
+  createdAt      DateTime       @default(now())
+  storeProducts  StoreProduct[]
+}
+
+// Un producto tal como aparece listado en un súper específico (su nombre, precio y URL propios).
+model StoreProduct {
+  id            String         @id @default(cuid())
+  store         Store          @relation(fields: [storeId], references: [id])
+  storeId       String
+  product       Product?       @relation(fields: [productId], references: [id])
+  productId     String?
+  rawName       String
+  price         Float
+  unit          String?
+  url           String
+  imageUrl      String?
+  inStock       Boolean        @default(true)
+  lastScrapedAt DateTime       @default(now())
+  priceHistory  PriceHistory[]
+
+  @@unique([storeId, url])
+  @@index([productId])
+}
+
+// Historial de precios de un StoreProduct, para ver tendencias con el tiempo.
+model PriceHistory {
+  id             String       @id @default(cuid())
+  storeProduct   StoreProduct @relation(fields: [storeProductId], references: [id])
+  storeProductId String
+  price          Float
+  scrapedAt      DateTime     @default(now())
+
+  @@index([storeProductId])
+}
