@@ -52,6 +52,10 @@ model StoreProduct {
   imageUrl      String?
   inStock       Boolean        @default(true)
   lastScrapedAt DateTime       @default(now())
+  // Cómo se decidió a qué Product enlazar este item: "ean" (código de
+  // barras, confiable), "name" (nombre normalizado idéntico) o "fuzzy"
+  // (similitud de nombre — puede fallar, se muestra como "probable" en la UI).
+  matchMethod   String         @default("name")
   priceHistory  PriceHistory[]
 
   @@unique([storeId, url])

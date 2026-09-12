@@ -83,20 +83,36 @@ export default async function Home({
               product.distinctStores > 1
                 ? product.storeProducts[0]
                 : undefined;
+            // Si alguno de los precios se enlazó por similitud de nombre en
+            // vez de código de barras/nombre exacto, no es 100% seguro que
+            // sea el mismo producto físico — lo marcamos para ser honestos.
+            const hasUncertainMatch =
+              product.distinctStores > 1 &&
+              product.storeProducts.some((sp) => sp.matchMethod === "fuzzy");
             return (
               <div
                 key={product.id}
                 className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <div className="flex items-baseline justify-between">
+                <div className="flex items-baseline justify-between gap-2">
                   <h2 className="text-lg font-medium text-zinc-950 dark:text-zinc-50">
                     {product.name}
                   </h2>
-                  {product.category && (
-                    <span className="text-sm text-zinc-500">
-                      {product.category}
-                    </span>
-                  )}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {hasUncertainMatch && (
+                      <span
+                        title="Estos precios se cruzaron por parecido de nombre, no por código de barras — puede que no sea exactamente el mismo producto en cada súper."
+                        className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                      >
+                        🟡 Coincidencia probable
+                      </span>
+                    )}
+                    {product.category && (
+                      <span className="text-sm text-zinc-500">
+                        {product.category}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <ul className="mt-4 flex flex-col gap-2">
@@ -119,6 +135,11 @@ export default async function Home({
                             {isCheapest && (
                               <span className="ml-2 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
                                 Más barato
+                              </span>
+                            )}
+                            {sp.matchMethod === "fuzzy" && (
+                              <span className="ml-2 text-xs font-normal text-zinc-400">
+                                (nombre distinto)
                               </span>
                             )}
                           </span>

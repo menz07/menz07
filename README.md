@@ -38,8 +38,26 @@ Pelin 5lb" vs "Arroz Especial Del Oro 5lb" no son el mismo producto). Por eso
 `Product` tiene un campo `ean` (código de barras): cuando el súper lo publica
 (VTEX lo trae en su catálogo), lo usamos como clave principal de matching —
 mismo EAN = mismo producto físico, sin importar cómo lo describa cada súper.
-Si no hay EAN, se cae al matching por nombre normalizado de antes (ver
-`src/scrapers/upsert.ts`).
+
+Cuando no hay EAN (ej. Magento no lo expone), el orden de fallback es:
+
+1. Nombre normalizado exacto.
+2. **Similitud de nombre** (`src/lib/fuzzy-match.ts`) — compara palabras y
+   tamaño/unidad extraídos del nombre, con varias reglas pensadas para evitar
+   falsos positivos: si un lado dice "sin sal" y el otro "con sal", si
+   mencionan frijoles de colores distintos, o si uno declara un tamaño (ej.
+   "5lb") y el otro no dice ningún tamaño, se rechaza el match aunque el
+   resto del nombre coincida. Esto se ajustó probando contra datos reales:
+   la primera versión encontraba 283 "coincidencias" para Riba Smith, pero
+   varias eran errores reales (frijoles negros vs bayos, 30 huevos vs una
+   docena); la versión final es más conservadora (14 matches) pero mucho más
+   confiable.
+
+Como igual puede fallar con nombres ambiguos, cada `StoreProduct` guarda
+`matchMethod` (`"ean" | "name" | "fuzzy"`), y la UI marca con
+"🟡 Coincidencia probable" los productos donde algún precio viene de un
+fuzzy match, para que quien use la app sepa que conviene verificar antes de
+ir a comprar.
 
 ## Empezar
 
@@ -133,12 +151,12 @@ contra la canasta completa de términos — la que usa el workflow de CI.)
 
 ## Próximos pasos sugeridos
 
-- **Matching de Riba Smith (y cualquier súper Magento sin EAN)**: sus 1175
-  productos hoy no cruzan con nadie porque Magento no expone código de
-  barras de fábrica y el nombre casi nunca coincide exacto con el de otro
-  súper. Alternativas: revisar si el catálogo tiene algún atributo custom
-  tipo `barcode`/`ean` vía introspección (`npm run probe` ya lo chequea), o
-  sumar fuzzy matching por marca + tamaño como segunda pasada.
+- Afinar más el fuzzy matching: hoy es deliberadamente conservador (rechaza
+  cualquier caso donde no pueda confirmar el tamaño/presentación), así que
+  deja pasar bastante recall a cambio de precisión. Si el catálogo de algún
+  súper Magento resulta tener un atributo custom tipo `barcode`/`ean`
+  (`npm run probe` ya chequea esto vía introspección), sería un salto de
+  calidad mejor que seguir afinando el matching por texto.
 - Implementar los 4 súpers que faltan (Super 99, Super Carnes, PriceSmart,
   El Rey — ver tabla de arriba para el detalle de cada bloqueo).
 - Página de detalle de producto con historial de precios (ya se guarda en
