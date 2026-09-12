@@ -28,48 +28,77 @@ import type { ScrapedProduct, StoreScraper } from "../types";
  */
 
 const SEARCH_URL = "https://www.supercarnes.com/catalogsearch/result/";
+const PAGE_SIZE = 36;
+const MAX_PAGES = 6;
+
+async function fetchPage(query: string, page: number): Promise<ScrapedProduct[]> {
+  const url = new URL(SEARCH_URL);
+  if (query) url.searchParams.set("q", query);
+  url.searchParams.set("product_list_limit", String(PAGE_SIZE));
+  if (page > 1) url.searchParams.set("p", String(page));
+
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; PriceCompareBot/1.0)" },
+    // Ver comentario en ../vtex.ts: sin esto una conexión colgada frena todo el job.
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Super Carnes: la página de búsqueda respondió ${res.status} ${res.statusText}.`,
+    );
+  }
+
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  const results: ScrapedProduct[] = [];
+  $("li.product-item").each((_, el) => {
+    const item = $(el);
+    const link = item.find("a.product-item-link").first();
+    const name = link.text().trim();
+    const productUrl = link.attr("href");
+    const priceText = item.find("[data-price-amount]").first().attr("data-price-amount");
+    const price = priceText ? Number(priceText) : NaN;
+    const imageUrl = item.find("img.product-image-photo").first().attr("src");
+
+    if (!name || !productUrl || !Number.isFinite(price) || price <= 0) return;
+
+    results.push({
+      rawName: name,
+      price,
+      url: productUrl,
+      imageUrl,
+    });
+  });
+
+  return results;
+}
 
 export const superCarnesScraper: StoreScraper = {
   storeSlug: "super-carnes",
   storeName: "Super Carnes",
   implemented: true,
   async scrape(query = ""): Promise<ScrapedProduct[]> {
-    const url = new URL(SEARCH_URL);
-    if (query) url.searchParams.set("q", query);
-
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; PriceCompareBot/1.0)" },
-      // Ver comentario en ../vtex.ts: sin esto una conexión colgada frena todo el job.
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) {
-      throw new Error(
-        `Super Carnes: la página de búsqueda respondió ${res.status} ${res.statusText}.`,
-      );
-    }
-
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
     const results: ScrapedProduct[] = [];
-    $("li.product-item").each((_, el) => {
-      const item = $(el);
-      const link = item.find("a.product-item-link").first();
-      const name = link.text().trim();
-      const productUrl = link.attr("href");
-      const priceText = item.find("[data-price-amount]").first().attr("data-price-amount");
-      const price = priceText ? Number(priceText) : NaN;
-      const imageUrl = item.find("img.product-image-photo").first().attr("src");
+    const seenUrls = new Set<string>();
 
-      if (!name || !productUrl || !Number.isFinite(price) || price <= 0) return;
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const pageResults = await fetchPage(query, page);
+      if (pageResults.length === 0) break;
 
-      results.push({
-        rawName: name,
-        price,
-        url: productUrl,
-        imageUrl,
-      });
-    });
+      let newOnThisPage = 0;
+      for (const item of pageResults) {
+        if (seenUrls.has(item.url)) continue;
+        seenUrls.add(item.url);
+        results.push(item);
+        newOnThisPage++;
+      }
+      // Si Magento ignoró el número de página (algunos temas lo hacen para
+      // búsquedas chicas) y nos devolvió lo mismo de vuelta, cortamos acá en
+      // vez de loopear hasta MAX_PAGES pidiendo lo mismo una y otra vez.
+      if (newOnThisPage === 0) break;
+      if (pageResults.length < PAGE_SIZE) break;
+    }
 
     return results;
   },
