@@ -79,8 +79,19 @@ const VARIANT_WORDS = new Set([
 ]);
 
 export interface NameTokens {
-  /** Tamaños normalizados, ej. ["800g", "5lb"]. */
+  /** Tamaños normalizados, ej. ["800g", "5lb"] — SOLO peso/volumen, no cantidad de unidades. */
   sizes: string[];
+  /**
+   * Cuántas unidades trae el paquete (ej. "12 Unidades", "docena" -> 12).
+   * 1 si el nombre no menciona ninguna cantidad (se asume que es una sola
+   * pieza). Se guarda aparte de `sizes` a propósito: un six-pack de latas de
+   * 946ml y una lata suelta de 946ml comparten el tamaño por unidad pero NO
+   * son el mismo producto ni el mismo precio — PriceSmart (venta por mayor)
+   * vende casi todo en multi-pack mientras el resto de los súpers vende por
+   * unidad, así que sin este chequeo el fuzzy match cruzaba una lata contra
+   * una caja de 12 y los daba por "el mismo producto" a 5-12x el precio.
+   */
+  packCount: number;
   /** Palabras significativas restantes. */
   words: string[];
 }
@@ -103,28 +114,42 @@ export function tokenizeProductName(rawName: string): NameTokens {
   const rawTokens = baseTokens(rawName);
   const sizes: string[] = [];
   const words: string[] = [];
+  let packCount = 1;
+  let sawPackCount = false;
 
   for (let i = 0; i < rawTokens.length; i++) {
     const tok = rawTokens[i];
 
     if (tok === "docena") {
-      sizes.push("12un");
+      packCount = 12;
+      sawPackCount = true;
       continue;
     }
 
-    // Número y unidad pegados, ej. "800g", "5lb", "2.27kg".
+    // Número y unidad pegados, ej. "800g", "5lb", "2.27kg", "12un".
     const stuck = tok.match(
       /^(\d+(?:\.\d+)?)(kg|kgs|g|gr|grs|lb|lbs|oz|ml|lt|lts|l|gal|gl|und|un)$/,
     );
     if (stuck) {
       const unit = UNIT_ALIASES[stuck[2]] ?? stuck[2];
-      sizes.push(`${stuck[1]}${unit}`);
+      if (unit === "un") {
+        packCount = Math.max(packCount, Number(stuck[1]) || 1);
+        sawPackCount = true;
+      } else {
+        sizes.push(`${stuck[1]}${unit}`);
+      }
       continue;
     }
 
     // Número suelto seguido de la unidad como palabra separada.
     if (/^\d+(\.\d+)?$/.test(tok) && i + 1 < rawTokens.length) {
       const unit = UNIT_ALIASES[rawTokens[i + 1]];
+      if (unit === "un") {
+        packCount = Math.max(packCount, Number(tok) || 1);
+        sawPackCount = true;
+        i++;
+        continue;
+      }
       if (unit) {
         sizes.push(`${tok}${unit}`);
         i++;
@@ -136,7 +161,11 @@ export function tokenizeProductName(rawName: string): NameTokens {
     words.push(tok);
   }
 
-  return { sizes: sizes.sort(), words };
+  // "1 unidad" explícito no es distinto de no decir nada — solo nos importa
+  // cuando el paquete trae MÁS de una pieza.
+  if (sawPackCount && packCount <= 1) packCount = 1;
+
+  return { sizes: sizes.sort(), packCount, words };
 }
 
 /** Dos tokens "compatibles" si son iguales o uno es prefijo del otro (para nombres abreviados, ej. "deslactos" / "deslactosada"). */
@@ -160,6 +189,12 @@ const MIN_SCORE = 0.85;
 
 /** 0 si no hay match suficiente; si no, un puntaje 0-1 de qué tan bien coinciden. */
 export function similarity(a: NameTokens, b: NameTokens): number {
+  if (a.packCount !== b.packCount) {
+    // Un six-pack no es lo mismo que una unidad suelta aunque el resto del
+    // nombre y el tamaño por pieza coincidan (ver comentario en NameTokens).
+    return 0;
+  }
+
   if (a.sizes.length && b.sizes.length) {
     const shareSize = a.sizes.some((s) => b.sizes.includes(s));
     if (!shareSize) return 0;
