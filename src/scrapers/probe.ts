@@ -15,6 +15,8 @@
  *     parezca JSON de catálogo, para poder armar el scraper real a mano.
  */
 
+export {};
+
 const TIMEOUT_MS = 15_000;
 
 async function fetchSafe(

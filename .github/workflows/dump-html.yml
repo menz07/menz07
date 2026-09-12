@@ -1,0 +1,37 @@
+name: Inspeccionar HTML de una página
+
+# Herramienta manual: hace un fetch plano (sin navegador) a una URL y busca
+# patrones típicos de listados de productos (JSON-LD, markup de Magento),
+# para armar un scraper por HTML cuando no hay API disponible o está
+# bloqueada. Corre en un runner con internet real.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL a inspeccionar"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dump-html:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Inspeccionar
+        env:
+          DUMP_URL: ${{ inputs.url }}
+        run: npm run dump-html -- "$DUMP_URL"

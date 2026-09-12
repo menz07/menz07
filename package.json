@@ -13,7 +13,8 @@
     "scrape": "tsx src/scrapers/run.ts",
     "scrape:all": "tsx src/scrapers/run-all.ts",
     "probe": "tsx src/scrapers/probe.ts",
-    "capture": "tsx src/scrapers/capture-network.ts"
+    "capture": "tsx src/scrapers/capture-network.ts",
+    "dump-html": "tsx src/scrapers/dump-html.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
