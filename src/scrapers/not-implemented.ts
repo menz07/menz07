@@ -14,6 +14,7 @@ export function notImplementedScraper(
   return {
     storeSlug,
     storeName,
+    implemented: false,
     async scrape() {
       throw new Error(
         `El scraper de ${storeName} todavía no está implementado. ` +

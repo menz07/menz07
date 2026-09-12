@@ -37,6 +37,9 @@ yarn-error.log*
 # sqlite database (datos locales/de desarrollo, no se versionan)
 /prisma/*.db
 /prisma/*.db-journal
+# excepto prisma/data.db: la genera y commitea el workflow de scraping
+# (.github/workflows/scrape.yml) con los precios reales más recientes.
+!/prisma/data.db
 
 # vercel
 .vercel

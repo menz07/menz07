@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:stores": "tsx prisma/seed-stores.ts",
     "db:studio": "prisma studio",
-    "scrape": "tsx src/scrapers/run.ts"
+    "scrape": "tsx src/scrapers/run.ts",
+    "scrape:all": "tsx src/scrapers/run-all.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

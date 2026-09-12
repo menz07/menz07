@@ -41,14 +41,42 @@ npm run db:seed          # carga los 7 súpers + productos de ejemplo (precios f
 npm run dev              # http://localhost:3000
 ```
 
-## ⚠️ Sobre el scraping: no funciona desde este entorno de desarrollo
+## 🤖 Scraping automático (GitHub Actions)
+
+`.github/workflows/scrape.yml` corre todos los días a las 7am hora de Panamá
+(y también se puede disparar a mano desde la pestaña "Actions" del repo, botón
+"Run workflow"). El job:
+
+1. Crea/actualiza `prisma/data.db` a partir de las migraciones.
+2. Asegura que los 7 súpers existan (`npm run db:seed:stores`).
+3. Corre `npm run scrape:all`, que busca una canasta de ~25 términos comunes
+   (arroz, leche, aceite, pollo, etc. — ver `src/scrapers/search-terms.ts`)
+   en cada súper que ya tiene scraper implementado.
+4. Si hubo cambios, commitea `prisma/data.db` de vuelta al repo.
+
+`prisma/data.db` sí se versiona en git (a diferencia de `prisma/dev.db`, que
+es solo para desarrollo local con datos de ejemplo) — es la forma más simple
+de tener "una base de datos con los precios más recientes" sin pagar/armar
+un hosting de base de datos aparte. Si el proyecto crece, conviene migrar
+a una base de datos real (Postgres) en vez de un archivo SQLite commiteado.
+
+Para ver los precios reales una vez que el workflow haya corrido al menos
+una vez:
+
+```bash
+git pull
+DATABASE_URL="file:./data.db" npm run dev
+```
+
+### ⚠️ Por qué esto no se pudo probar desde este entorno de desarrollo
 
 Este proyecto se desarrolló en un entorno con **acceso a internet
 restringido** (solo puede llegar a dominios como GitHub/npm, no a los sitios
-de los supermercados). Por eso los scrapers reales **no se pudieron probar
-contra los sitios en vivo** todavía. Para correrlos de verdad hace falta un
-entorno con internet completo: tu computadora, un VPS, o un cron job en
-GitHub Actions (los runners de GitHub Actions sí tienen internet completo).
+de los supermercados) — por política de la organización, no algo temporal.
+Por eso los scrapers reales **no se pudieron probar contra los sitios en
+vivo** todavía; el workflow de GitHub Actions de arriba es justamente la
+forma de correrlos desde un lugar con internet completo sin depender de tu
+computadora.
 
 Estado actual de cada súper (`src/scrapers/stores/`):
 
@@ -62,7 +90,7 @@ Estado actual de cada súper (`src/scrapers/stores/`):
 | PriceSmart | ⛔ Pendiente | Plataforma propia (URLs tipo `/categoria/Alimentos-G10D03/G10D03`), no parece VTEX. |
 | Super Carnes | ⛔ Pendiente | supercarnes.com — falta inspeccionar. |
 
-### Cómo probar un scraper con internet real
+### Probar un solo scraper a mano
 
 ```bash
 npm run scrape -- "arroz" super-xtra
@@ -71,6 +99,8 @@ npm run scrape -- "arroz" super-xtra
 Esto va a pegarle a la API de Super Xtra, y si responde con el formato
 esperado, va a guardar los productos/precios en la base de datos. Si el
 sitio no es VTEX o cambió su API, va a tirar un error explicando qué pasó.
+(`npm run scrape:all` es la versión que corre todos los súpers implementados
+contra la canasta completa de términos — la que usa el workflow de CI.)
 
 ### Agregar un súper nuevo
 

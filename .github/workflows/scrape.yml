@@ -1,0 +1,63 @@
+name: Scrapear precios
+
+# Corre en un runner de GitHub, que sí tiene salida a internet completa
+# hacia los sitios de los supermercados (a diferencia de algunos entornos
+# de desarrollo sandboxeados). Guarda los resultados en prisma/data.db y
+# los commitea de vuelta al repo.
+on:
+  schedule:
+    # Todos los días 12:00 UTC = 7:00am hora de Panamá (UTC-5, sin horario de verano).
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: scrape-precios
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar cliente de Prisma
+        run: npx prisma generate
+
+      - name: Preparar base de datos (prisma/data.db)
+        env:
+          DATABASE_URL: file:./data.db
+        run: npx prisma migrate deploy
+
+      - name: Asegurar que existan los súpers
+        env:
+          DATABASE_URL: file:./data.db
+        run: npm run db:seed:stores
+
+      - name: Scrapear todos los súpers implementados
+        env:
+          DATABASE_URL: file:./data.db
+        run: npm run scrape:all
+
+      - name: Commitear precios actualizados
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add prisma/data.db
+          if git diff --cached --quiet; then
+            echo "Sin cambios en los precios, no se commitea nada."
+          else
+            git commit -m "chore: actualizar precios scrapeados"
+            git push
+          fi
