@@ -99,23 +99,34 @@ async function probeSite(baseUrl: string) {
   }
 
   // Magento: API GraphQL pública (la mayoría de las tiendas Magento la
-  // dejan abierta para lectura de catálogo).
-  const magento = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query:
-        '{ products(search: "leche", pageSize: 3) { total_count items { name sku } } }',
-    }),
-  });
-  if (magento.error) {
-    console.log(`  Magento GraphQL: ERROR — ${magento.error}`);
-  } else {
-    const hasData = magento.text.includes('"products"');
+  // dejan abierta para lectura de catálogo). Algunas instancias fallan con
+  // `search` (fulltext) y sí andan con `filter` por nombre, o viceversa —
+  // probamos las dos variantes.
+  const magentoQueries: [string, string][] = [
+    [
+      "search",
+      '{ products(search: "leche", pageSize: 3) { total_count items { name sku } } }',
+    ],
+    [
+      "filter",
+      '{ products(filter: { name: { match: "leche" } }, pageSize: 3) { total_count items { name sku } } }',
+    ],
+  ];
+  for (const [variant, query] of magentoQueries) {
+    const magento = await fetchSafe(`${baseUrl.replace(/\/$/, "")}/graphql`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    if (magento.error) {
+      console.log(`  Magento GraphQL (${variant}): ERROR — ${magento.error}`);
+      continue;
+    }
+    const hasData = /"products":\s*\{\s*"total_count":\s*[1-9]/.test(magento.text);
     console.log(
-      `  Magento GraphQL: HTTP ${magento.status}${hasData ? " — ¡tiene catálogo por GraphQL!" : ""}`,
+      `  Magento GraphQL (${variant}): HTTP ${magento.status}${hasData ? " — ¡tiene catálogo!" : ""}`,
     );
-    if (hasData) console.log(`    Muestra: ${magento.text.slice(0, 500)}`);
+    console.log(`    Muestra: ${magento.text.slice(0, 500)}`);
   }
 
   // Shopify: catálogo público en /products.json.
